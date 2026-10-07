@@ -102,12 +102,12 @@ class TestFilters:
     def test_mrkdwn_does_not_double_escape_ampersand_ordering(self):
         assert rs.env.from_string("{{ s | mrkdwn }}").render(s="<&>") == "&lt;&amp;&gt;"
 
-    @pytest.mark.parametrize("text,expected", [("a\nb", "a"), ("single", "single"), ("", ""), ("\nx", "")])
+    @pytest.mark.parametrize(("text", "expected"), [("a\nb", "a"), ("single", "single"), ("", ""), ("\nx", "")])
     def test_first_line(self, text, expected):
         assert rs.env.from_string("{{ s | first_line }}").render(s=text) == expected
 
     @pytest.mark.parametrize(
-        "status,emoji",
+        ("status", "emoji"),
         [
             ("success", ":white_check_mark:"),
             ("failure", ":x:"),
@@ -227,7 +227,8 @@ class TestCli:
     def test_output_flag_writes_file_and_keeps_stdout_empty(self, tpl, tmp_path):
         out = tmp_path / "out.json"
         r = run_cli(str(tpl), "-o", str(out), SLACK_VAR_X="v")
-        assert r.returncode == 0 and r.stdout == ""
+        assert r.returncode == 0
+        assert r.stdout == ""
         assert load(out) == {"text": "v"}
 
     @pytest.mark.parametrize(
@@ -240,11 +241,14 @@ class TestCli:
     )
     def test_bad_input_fails_cleanly(self, tpl, args):
         r = run_cli(str(tpl), *args, SLACK_VAR_X="v")
-        assert r.returncode != 0 and r.stderr.startswith("render_slack:") and "Traceback" not in r.stderr
+        assert r.returncode != 0
+        assert r.stderr.startswith("render_slack:")
+        assert "Traceback" not in r.stderr
 
     def test_missing_variable_exits_nonzero(self, tpl):
         r = run_cli(str(tpl))
-        assert r.returncode != 0 and "X" in r.stderr
+        assert r.returncode != 0
+        assert "X" in r.stderr
 
     def test_missing_template_file(self, tmp_path):
         assert run_cli(str(tmp_path / "nope.json")).returncode != 0
@@ -292,8 +296,10 @@ class TestActionRunBlock:
 
     def test_path_traversal_in_template_name_is_rejected(self, tmp_path):
         r, _ = self.run(tmp_path, TEMPLATE="../../etc/passwd")
-        assert r.returncode != 0 and "invalid template name" in r.stdout
+        assert r.returncode != 0
+        assert "invalid template name" in r.stdout
 
     def test_missing_extras_fail_the_step(self, tmp_path):
         r, out = self.run(tmp_path, TEMPLATE="deploy")
-        assert r.returncode != 0 and out == ""
+        assert r.returncode != 0
+        assert out == ""

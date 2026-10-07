@@ -21,6 +21,7 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 
 from jinja2 import StrictUndefined, TemplateError
 from jinja2.sandbox import SandboxedEnvironment
@@ -84,7 +85,7 @@ def main():
     try:
         ctx = {k.removeprefix(ENV_PREFIX): v for k, v in os.environ.items() if k.startswith(ENV_PREFIX)}
         if args.vars:
-            with open(args.vars) as f:
+            with Path.open(args.vars) as f:
                 ctx.update(as_object(json.load(f), "--vars file"))
         if args.vars_json:
             ctx.update(as_object(json.loads(args.vars_json), "--vars-json"))
@@ -94,7 +95,7 @@ def main():
                 raise ValueError(f"--var expects KEY=VALUE, got {item!r}")
             ctx[key] = value
 
-        with open(args.template) as f:
+        with Path.open(args.template) as f:
             template = json.load(f)
         payload = render(template, ctx)
         validate(payload)
@@ -103,7 +104,7 @@ def main():
 
     out = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
     if args.output:
-        with open(args.output, "w") as f:
+        with Path.open(args.output, "w") as f:
             f.write(out)
     else:
         sys.stdout.write(out)

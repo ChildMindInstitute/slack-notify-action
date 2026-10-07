@@ -137,10 +137,11 @@ def test_template_golden_output(path):
 def action_default_vars():
     action = yaml.safe_load((ROOT / "action.yml").read_text())
     step = next(s for s in action["runs"]["steps"] if s.get("id") == "render")
+
     return {k.removeprefix("SLACK_VAR_") for k in step["env"] if k.startswith("SLACK_VAR_")}
 
 @pytest.mark.parametrize("path", TEMPLATES, ids=TEMPLATE_IDS)
-def test_every_template_variable_is_provided_by_the_action(path):
+def test_every_template_variable_is_provided_by_the_action(path, monkeypatch):
     """Guards against a template using a variable action.yml never sets."""
     needed = set()
 
@@ -156,6 +157,7 @@ def test_every_template_variable_is_provided_by_the_action(path):
 
     walk(load(path))
     provided = action_default_vars() | EXTRA_VARS.get(path.stem, set())
+
     assert needed <= provided, f"{path.name} uses undefined variables: {sorted(needed - provided)}"
 
 
@@ -226,9 +228,10 @@ class TestActionRunBlock:
         gh_output = tmp_path / "gh_output"
         gh_output.touch()
         base = {k: v for k, v in CTX.items() if k not in EXTRA_VARS["deploy"]}
+
         full = clean_env(
             ACTION_PATH=str(ROOT), RUNNER_TEMP=str(tmp_path), GITHUB_OUTPUT=str(gh_output),
-            TEMPLATE="workflow", TEMPLATE_FILE="", VARS_JSON="", OUTPUT_FILE="",
+            TEMPLATE="workflow", TEMPLATE_FILE="", OUTPUT_FILE="",
             **{f"SLACK_VAR_{k}": v for k, v in base.items()},
         )
         full.update(env)
@@ -242,8 +245,8 @@ class TestActionRunBlock:
         assert path == str(tmp_path / "slack-payload.json")
         rs.validate(load(path))
 
-    def test_vars_json_supplies_template_extras(self, tmp_path):
-        r, out = self.run(tmp_path, TEMPLATE="deploy", VARS_JSON='{"SERVICE": "svc", "ENVIRONMENT": "prod"}')
+    def test_vars_from_action_supplies_template_extras(self, tmp_path, monkeypatch):
+        r, out = self.run(tmp_path, TEMPLATE="deploy", SLACK_VAR_SERVICE="svc", SLACK_VAR_ENVIRONMENT="prod")
         assert r.returncode == 0, r.stderr
         assert "svc" in load(out.strip().removeprefix("payload-file="))["text"]
 

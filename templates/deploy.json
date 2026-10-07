@@ -1,0 +1,32 @@
+{
+  "text": "{{ STATUS | status_emoji }} {{ SERVICE }} deploy {{ STATUS }}",
+  "blocks": [
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "{{ STATUS | status_emoji }} Deploy {{ STATUS }}: {{ SERVICE }}", "emoji": true }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Environment:*\n{{ ENVIRONMENT }}" },
+        { "type": "mrkdwn", "text": "*Branch:*\n`{{ BRANCH }}`" },
+        { "type": "mrkdwn", "text": "*Triggered by:*\n{{ ACTOR }}" },
+        { "type": "mrkdwn", "text": "*Commit:*\n<{{ COMMIT_URL }}|{{ SHA[:7] }}>" }
+      ]
+    },
+    {
+      "type": "section",
+      "text": { "type": "mrkdwn", "text": "*Change:*\n{{ (COMMIT_MESSAGE or PR_TITLE) | first_line | truncate(200) | mrkdwn }}" }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        { "type": "button", "text": { "type": "plain_text", "text": "View run" }, "url": "{{ RUN_URL }}" }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [ { "type": "mrkdwn", "text": "{{ REPO }} • run #{{ RUN_NUMBER }}" } ]
+    }
+  ]
+}

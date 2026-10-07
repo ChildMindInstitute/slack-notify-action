@@ -1,0 +1,24 @@
+{
+  "text": "{{ STATUS | status_emoji }} {{ WORKFLOW }} {{ STATUS }} in {{ REPO }}",
+  "blocks": [
+    {
+      "type": "header",
+      "text": { "type": "plain_text", "text": "{{ STATUS | status_emoji }} {{ WORKFLOW | truncate(100) }}: {{ STATUS }}", "emoji": true }
+    },
+    {
+      "type": "section",
+      "fields": [
+        { "type": "mrkdwn", "text": "*Repo:*\n{{ REPO }}" },
+        { "type": "mrkdwn", "text": "*Branch:*\n`{{ BRANCH }}`" },
+        { "type": "mrkdwn", "text": "*Triggered by:*\n{{ ACTOR }} ({{ EVENT }})" },
+        { "type": "mrkdwn", "text": "*Commit:*\n<{{ COMMIT_URL }}|{{ SHA[:7] }}>" }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        { "type": "button", "text": { "type": "plain_text", "text": "View run" }, "url": "{{ RUN_URL }}" }
+      ]
+    }
+  ]
+}

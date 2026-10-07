@@ -1,0 +1,119 @@
+name: Slack notify
+description: Render a Block Kit template (Jinja2 placeholders) and post it to a Slack incoming webhook.
+
+inputs:
+  template:
+    description: Built-in template name (templates/<name>.json in this repo)
+    default: workflow
+  template-file:
+    description: Path to a template in the calling repo (needs actions/checkout first). Overrides `template`.
+    default: ""
+  status:
+    description: Pass `${{ job.status }}` from the caller (success / failure / cancelled)
+    default: success
+  vars:
+    description: JSON object of extra template variables, e.g. '{"SERVICE":"api"}'. Overrides the defaults.
+    default: ""
+  webhook-url:
+    description: Slack incoming webhook URL. If empty, the payload is rendered and printed but not posted.
+    default: ""
+  output-file:
+    description: Where to write the rendered payload (default $RUNNER_TEMP/slack-payload.json)
+    default: ""
+
+outputs:
+  payload-file:
+    description: Path to the rendered JSON payload
+    value: ${{ steps.render.outputs.payload-file }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect-uv
+      shell: bash
+      run: |
+        if command -v uv >/dev/null 2>&1; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - uses: astral-sh/setup-uv@v6
+      if: steps.detect-uv.outputs.present != 'true'
+      with:
+        enable-cache: false
+
+    - id: parse-vars
+      shell: bash
+      run: |
+        # Turn input.vars into environment variables and add them to the environment
+        VARIABLES='${{ inputs.vars }}'
+
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+        
+            key="${line%%=*}"
+            value="${line#*=}"
+        
+            if [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+                echo "Invalid variable name: $key" >&2
+                exit 1
+            fi
+        
+            echo "SLACK_VAR_$key=$value" >> "$GITHUB_ENV"
+        done <<< "$VARIABLES"
+
+    - id: render
+      shell: bash
+      # Everything user-controlled goes through env, never inlined into `run`.
+      env:
+        TEMPLATE: ${{ inputs.template }}
+        TEMPLATE_FILE: ${{ inputs.template-file }}
+        VARS_JSON: ${{ inputs.vars }}
+        OUTPUT_FILE: ${{ inputs.output-file }}
+        ACTION_PATH: ${{ github.action_path }}
+        # Defaults available to every template
+        SLACK_VAR_STATUS: ${{ inputs.status }}
+        SLACK_VAR_REPO: ${{ github.repository }}
+        SLACK_VAR_ACTOR: ${{ github.actor }}
+        SLACK_VAR_WORKFLOW: ${{ github.workflow }}
+        SLACK_VAR_EVENT: ${{ github.event_name }}
+        SLACK_VAR_BRANCH: ${{ github.head_ref || github.ref_name }}
+        SLACK_VAR_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        SLACK_VAR_COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.pull_request.head.sha || github.sha }}
+        SLACK_VAR_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        SLACK_VAR_PR_TITLE: ${{ github.event.pull_request.title }}
+        SLACK_VAR_PR_NUMBER: ${{ github.event.pull_request.number }}
+        SLACK_VAR_PR_URL: ${{ github.event.pull_request.html_url }}
+        SLACK_VAR_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        SLACK_VAR_RUN_NUMBER: ${{ github.run_number }}
+      run: |
+        set -euo pipefail
+        if [[ -n "$TEMPLATE_FILE" ]]; then
+          tpl="$TEMPLATE_FILE"
+        else
+          [[ "$TEMPLATE" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::invalid template name: $TEMPLATE"; exit 1; }
+          tpl="$ACTION_PATH/templates/$TEMPLATE.json"
+        fi
+        out="${OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/slack-payload.json}"
+        args=()
+        [[ -n "$VARS_JSON" ]] && args+=(--vars-json "$VARS_JSON")
+        uv run "$ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"} -o "$out"
+        echo "payload-file=$out" >> "$GITHUB_OUTPUT"
+
+    - name: Show payload (no webhook-url given)
+      if: inputs.webhook-url == ''
+      shell: bash
+      env:
+        PAYLOAD_FILE: ${{ steps.render.outputs.payload-file }}
+      run: |
+        echo "::notice::No webhook-url provided; rendered only, not posted."
+        cat "$PAYLOAD_FILE"
+
+    - name: Post to Slack
+      if: inputs.webhook-url != ''
+      uses: slackapi/slack-github-action@v2
+      with:
+        webhook: ${{ inputs.webhook-url }}
+        webhook-type: incoming-webhook
+        payload-file-path: ${{ steps.render.outputs.payload-file }}

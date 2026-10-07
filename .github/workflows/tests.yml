@@ -1,0 +1,102 @@
+# .github/workflows/test.yml  (in the slack-notify repo itself)
+name: test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      live-post:
+        description: Also post a real message to the test webhook
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run pytest -q
+
+  # Exercises the composite action itself, exactly as a consumer repo would use it.
+  # `uses: ./` works because checkout puts this repo at the workspace root.
+  action:
+    needs: unit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Built-in template, dry run (no webhook-url)
+        id: builtin
+        uses: ./
+        with:
+          status: failure
+          template: deploy
+          vars: '{"SERVICE": "ci-test", "ENVIRONMENT": "test"}'
+
+      - name: Assert built-in payload
+        env:
+          PAYLOAD_FILE: ${{ steps.builtin.outputs.payload-file }}
+        run: |
+          python3 - << 'PY'
+          import json, os
+          d = json.load(open(os.environ["PAYLOAD_FILE"]))
+          assert ":x:" in d["text"] and "ci-test" in d["text"], d["text"]
+          assert d["blocks"][0]["type"] == "header"
+          PY
+
+      - name: Custom template from the calling repo
+        run: |
+          mkdir -p .github/slack
+          echo '{"blocks":[{"type":"section","text":{"type":"mrkdwn","text":"Release {{ VERSION }} by {{ ACTOR }}"}}]}' > .github/slack/custom.json
+
+      - name: Render custom template
+        id: custom
+        uses: ./
+        with:
+          template-file: .github/slack/custom.json
+          vars: '{"VERSION": "1.2.3"}'
+
+      - name: Assert custom payload
+        env:
+          PAYLOAD_FILE: ${{ steps.custom.outputs.payload-file }}
+          EXPECTED_ACTOR: ${{ github.actor }}
+        run: |
+          python3 - << 'PY'
+          import json, os
+          text = json.load(open(os.environ["PAYLOAD_FILE"]))["blocks"][0]["text"]["text"]
+          assert text == f"Release 1.2.3 by {os.environ['EXPECTED_ACTOR']}", text
+          PY
+
+      - name: Missing template variable must fail the action
+        id: missing
+        uses: ./
+        continue-on-error: true
+        with:
+          template: deploy   # needs SERVICE / ENVIRONMENT, deliberately not given
+
+      - name: Assert the previous step failed
+        if: steps.missing.outcome != 'failure'
+        run: |
+          echo "::error::expected the action to fail on a missing variable"
+          exit 1
+
+  live-post:
+    if: github.event_name == 'workflow_dispatch' && inputs.live-post
+    needs: action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          status: success
+          template: workflow
+          webhook-url: ${{ secrets.SLACK_TEST_WEBHOOK_URL }}

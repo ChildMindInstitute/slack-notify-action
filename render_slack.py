@@ -16,6 +16,7 @@ JSON is parsed, so values can never break the JSON. Missing variables are an
 error. Extra filters: mrkdwn (escape & < >), first_line, status_emoji.
 The result is validated against Slack's Block Kit models before it is written.
 """
+
 import argparse
 import json
 import os

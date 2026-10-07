@@ -1,8 +1,9 @@
 """Unit + contract tests for render_slack.py, the templates, and the action's run-block.
 
-    uv run pytest                      # run everything
-    UPDATE_GOLDEN=1 uv run pytest      # regenerate tests/golden/*.json after an intentional change
+uv run pytest                      # run everything
+UPDATE_GOLDEN=1 uv run pytest      # regenerate tests/golden/*.json after an intentional change
 """
+
 import json
 import os
 import shutil
@@ -24,11 +25,22 @@ TEMPLATE_IDS = [p.stem for p in TEMPLATES]
 
 # Variables the action provides by default, plus the extras `vars:` supplies.
 CTX = {
-    "STATUS": "success", "REPO": "me/app", "ACTOR": "andrew", "WORKFLOW": "Deploy", "EVENT": "push",
-    "BRANCH": "main", "SHA": "abc1234def5678", "COMMIT_URL": "https://github.com/me/app/commit/abc1234",
-    "COMMIT_MESSAGE": 'Fix "quotes" & <tags>\nsecond line', "PR_TITLE": "", "PR_NUMBER": "", "PR_URL": "",
-    "RUN_URL": "https://github.com/me/app/actions/runs/9", "RUN_NUMBER": "7",
-    "SERVICE": "myapp", "ENVIRONMENT": "production",
+    "STATUS": "success",
+    "REPO": "me/app",
+    "ACTOR": "andrew",
+    "WORKFLOW": "Deploy",
+    "EVENT": "push",
+    "BRANCH": "main",
+    "SHA": "abc1234def5678",
+    "COMMIT_URL": "https://github.com/me/app/commit/abc1234",
+    "COMMIT_MESSAGE": 'Fix "quotes" & <tags>\nsecond line',
+    "PR_TITLE": "",
+    "PR_NUMBER": "",
+    "PR_URL": "",
+    "RUN_URL": "https://github.com/me/app/actions/runs/9",
+    "RUN_NUMBER": "7",
+    "SERVICE": "myapp",
+    "ENVIRONMENT": "production",
 }
 # Variables a built-in template needs that the action does NOT set by default.
 EXTRA_VARS = {"deploy": {"SERVICE", "ENVIRONMENT"}}
@@ -49,9 +61,19 @@ class TestRender:
         out = rs.render(tpl, {"A": "a", "B": "b", "KEY": "k"})
         assert out == {"{{ KEY }}": ["a", {"x": "b-a"}, 5, None, True]}
 
-    @pytest.mark.parametrize("value", [
-        'say "hi"', "line1\nline2", "back\\slash", "emoji 🚀 ünï", "{braces}", "it's", "</script>", "",
-    ])
+    @pytest.mark.parametrize(
+        "value",
+        [
+            'say "hi"',
+            "line1\nline2",
+            "back\\slash",
+            "emoji 🚀 ünï",
+            "{braces}",
+            "it's",
+            "</script>",
+            "",
+        ],
+    )
     def test_awkward_values_survive_json_roundtrip(self, value):
         out = rs.render({"text": "{{ V }}"}, {"V": value})
         assert json.loads(json.dumps(out))["text"] == value
@@ -68,7 +90,9 @@ class TestRender:
             rs.render({"t": "{{ ''.__class__.__mro__ }}"}, {})
 
     def test_slicing_and_expressions(self):
-        assert rs.render({"t": "{{ SHA[:7] }} {{ 'a' if X else 'b' }}"}, {"SHA": "1234567890", "X": 0}) == {"t": "1234567 b"}
+        assert rs.render({"t": "{{ SHA[:7] }} {{ 'a' if X else 'b' }}"}, {"SHA": "1234567890", "X": 0}) == {
+            "t": "1234567 b"
+        }
 
 
 class TestFilters:
@@ -82,9 +106,15 @@ class TestFilters:
     def test_first_line(self, text, expected):
         assert rs.env.from_string("{{ s | first_line }}").render(s=text) == expected
 
-    @pytest.mark.parametrize("status,emoji", [
-        ("success", ":white_check_mark:"), ("failure", ":x:"), ("cancelled", ":warning:"), ("???", ":grey_question:"),
-    ])
+    @pytest.mark.parametrize(
+        "status,emoji",
+        [
+            ("success", ":white_check_mark:"),
+            ("failure", ":x:"),
+            ("cancelled", ":warning:"),
+            ("???", ":grey_question:"),
+        ],
+    )
     def test_status_emoji(self, status, emoji):
         assert rs.env.from_string("{{ s | status_emoji }}").render(s=status) == emoji
 
@@ -116,12 +146,14 @@ class TestValidate:
 
 # ----------------------------------------------------------------- built-in templates
 
+
 @pytest.mark.parametrize("path", TEMPLATES, ids=TEMPLATE_IDS)
 def test_template_renders_validates_and_has_fallback_text(path):
     payload = rs.render(load(path), CTX)
     rs.validate(payload)
     assert json.loads(json.dumps(payload)) == payload
     assert payload["text"], "top-level `text` is the notification fallback; keep it"
+
 
 @pytest.mark.skip
 @pytest.mark.parametrize("path", TEMPLATES, ids=TEMPLATE_IDS)
@@ -139,6 +171,7 @@ def action_default_vars():
     step = next(s for s in action["runs"]["steps"] if s.get("id") == "render")
 
     return {k.removeprefix("SLACK_VAR_") for k in step["env"] if k.startswith("SLACK_VAR_")}
+
 
 @pytest.mark.parametrize("path", TEMPLATES, ids=TEMPLATE_IDS)
 def test_every_template_variable_is_provided_by_the_action(path, monkeypatch):
@@ -197,11 +230,14 @@ class TestCli:
         assert r.returncode == 0 and r.stdout == ""
         assert load(out) == {"text": "v"}
 
-    @pytest.mark.parametrize("args", [
-        ["--vars-json", "{oops"],        # malformed JSON
-        ["--vars-json", "[1, 2]"],       # not an object
-        ["-v", "NOEQUALS"],              # bad KEY=VALUE
-    ])
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--vars-json", "{oops"],  # malformed JSON
+            ["--vars-json", "[1, 2]"],  # not an object
+            ["-v", "NOEQUALS"],  # bad KEY=VALUE
+        ],
+    )
     def test_bad_input_fails_cleanly(self, tpl, args):
         r = run_cli(str(tpl), *args, SLACK_VAR_X="v")
         assert r.returncode != 0 and r.stderr.startswith("render_slack:") and "Traceback" not in r.stderr
@@ -230,8 +266,12 @@ class TestActionRunBlock:
         base = {k: v for k, v in CTX.items() if k not in EXTRA_VARS["deploy"]}
 
         full = clean_env(
-            ACTION_PATH=str(ROOT), RUNNER_TEMP=str(tmp_path), GITHUB_OUTPUT=str(gh_output),
-            TEMPLATE="workflow", TEMPLATE_FILE="", OUTPUT_FILE="",
+            ACTION_PATH=str(ROOT),
+            RUNNER_TEMP=str(tmp_path),
+            GITHUB_OUTPUT=str(gh_output),
+            TEMPLATE="workflow",
+            TEMPLATE_FILE="",
+            OUTPUT_FILE="",
             **{f"SLACK_VAR_{k}": v for k, v in base.items()},
         )
         full.update(env)

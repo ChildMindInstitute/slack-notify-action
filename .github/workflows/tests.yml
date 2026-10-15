@@ -18,7 +18,7 @@ jobs:
   unit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
       - run: make test
 
@@ -40,7 +40,9 @@ jobs:
         with:
           status: failure
           template: deploy
-          vars: '{"SERVICE": "ci-test", "ENVIRONMENT": "test"}'
+          vars: |
+            SERVICE=ci-test
+            ENVIRONMENT=test
 
       - name: Assert built-in payload
         env:
@@ -63,7 +65,8 @@ jobs:
         uses: ./
         with:
           template-file: .github/slack/custom.json
-          vars: '{"VERSION": "1.2.3"}'
+          vars: | 
+            VERSION=1.2.3
 
       - name: Assert custom payload
         env:
@@ -94,7 +97,7 @@ jobs:
     needs: action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: ./
         with:
           status: success

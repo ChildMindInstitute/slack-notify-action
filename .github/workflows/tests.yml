@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv run pytest -q
+      - run: make test
 
   # Exercises the composite action itself, exactly as a consumer repo would use it.
   # `uses: ./` works because checkout puts this repo at the workspace root.

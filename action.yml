@@ -49,7 +49,7 @@ runs:
         # Turn input.vars into environment variables and add them to the environment
         VARIABLES='${{ inputs.vars }}'
         
-        PARSED_VARS=""
+        PARSED_VARS=()
 
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -62,8 +62,7 @@ runs:
                 exit 1
             fi
         
-            PARSED_VARS+=" --var $key=$value"
-#            echo "SLACK_VAR_$key=$value" >> "$GITHUB_ENV"
+            PARSED_VARS+=("-v $key=$value")
         done <<< "$VARIABLES"
         echo "PARSED_VARS=$PARSED_VARS" >> "$GITHUB_OUTPUT"
 
@@ -100,10 +99,29 @@ runs:
           tpl="$ACTION_PATH/templates/$TEMPLATE.json"
         fi
         out="${OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/slack-payload.json}"
+        
         args=()
+        
+        # Parse variables from action        
+        VARIABLES='${{ inputs.vars }}'
+        
+        if [[ -n "${VARIABLES:-}" ]]; then
+          read -r -a vars <<< "$VARIABLES"
+        
+          for var in "${vars[@]}"; do
+            args+=(-v "$var")
+          done
+        fi
+        
         # [[ -n "$VARS_JSON" ]] && args+=(--vars-json "$VARS_JSON")
-        [[ -n "${{ steps.parse-vars.outputs.PARSED_VARS }}" ]] && args+=("${{ steps.parse-vars.outputs.PARSED_VARS }}")
-        uv run "$ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"} -o "$out"
+      
+        
+        if [[ ${#args[@]} -gt 0 ]]; then
+          echo "Running $ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"}
+          uv run "$ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"} -o "$out"
+        else
+          uv run "$ACTION_PATH/render_slack.py" "$tpl" -o "$out"
+        fi
         echo "payload-file=$out" >> "$GITHUB_OUTPUT"
 
     - name: Show payload (no webhook-url given)

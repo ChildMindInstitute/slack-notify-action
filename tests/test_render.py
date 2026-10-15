@@ -264,7 +264,7 @@ def render_step():
 class TestActionRunBlock:
     """Executes the exact `run:` script from action.yml (needs uv; resolves the PEP 723 deps)."""
 
-    def run(self, tmp_path, **env):
+    def run(self, tmp_path, arg_list="", **env):
         gh_output = tmp_path / "gh_output"
         gh_output.touch()
         base = {k: v for k, v in CTX.items() if k not in EXTRA_VARS["deploy"]}
@@ -279,7 +279,12 @@ class TestActionRunBlock:
             **{f"SLACK_VAR_{k}": v for k, v in base.items()},
         )
         full.update(env)
-        r = subprocess.run(["bash", "-c", render_step()["run"]], capture_output=True, text=True, env=full)
+
+        run_step = render_step()["run"]
+        run_step = run_step.replace("${{ inputs.vars }}", arg_list)
+
+        r = subprocess.run(["bash", "-c", run_step], capture_output=True, text=True, env=full)
+        print(r.stdout)
         return r, gh_output.read_text()
 
     def test_success_sets_output_and_writes_valid_payload(self, tmp_path):
@@ -290,7 +295,7 @@ class TestActionRunBlock:
         rs.validate(load(path))
 
     def test_vars_from_action_supplies_template_extras(self, tmp_path, monkeypatch):
-        r, out = self.run(tmp_path, TEMPLATE="deploy", SLACK_VAR_SERVICE="svc", SLACK_VAR_ENVIRONMENT="prod")
+        r, out = self.run(tmp_path, "SERVICE=svc ENVIRONMENT=prod",  TEMPLATE="deploy")
         assert r.returncode == 0, r.stderr
         assert "svc" in load(out.strip().removeprefix("payload-file="))["text"]
 

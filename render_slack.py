@@ -84,6 +84,7 @@ def main():
 
     try:
         ctx = {k.removeprefix(ENV_PREFIX): v for k, v in os.environ.items() if k.startswith(ENV_PREFIX)}
+
         if args.vars:
             with Path.open(args.vars) as f:
                 ctx.update(as_object(json.load(f), "--vars file"))
@@ -96,6 +97,7 @@ def main():
             if not sep:
                 raise ValueError(f"--var expects KEY=VALUE, got {item!r}")
             ctx[key] = value
+        # print(ctx)
 
         with Path.open(args.template) as f:
             template = json.load(f)

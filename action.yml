@@ -38,7 +38,7 @@ runs:
           echo "present=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - uses: astral-sh/setup-uv@v6
+    - uses: astral-sh/setup-uv@v7
       if: steps.detect-uv.outputs.present != 'true'
       with:
         enable-cache: false
@@ -48,6 +48,8 @@ runs:
       run: |
         # Turn input.vars into environment variables and add them to the environment
         VARIABLES='${{ inputs.vars }}'
+        
+        PARSED_VARS=""
 
         while IFS= read -r line; do
             [[ -z "$line" ]] && continue
@@ -60,8 +62,10 @@ runs:
                 exit 1
             fi
         
-            echo "SLACK_VAR_$key=$value" >> "$GITHUB_ENV"
+            PARSED_VARS+=" --var $key=$value"
+#            echo "SLACK_VAR_$key=$value" >> "$GITHUB_ENV"
         done <<< "$VARIABLES"
+        echo "PARSED_VARS=$PARSED_VARS" >> "$GITHUB_OUTPUT"
 
     - id: render
       shell: bash
@@ -98,6 +102,7 @@ runs:
         out="${OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/slack-payload.json}"
         args=()
         # [[ -n "$VARS_JSON" ]] && args+=(--vars-json "$VARS_JSON")
+        [[ -n "${{ steps.parse-vars.outputs.PARSED_VARS }}" ]] && args+=("${{ steps.parse-vars.outputs.PARSED_VARS }}")
         uv run "$ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"} -o "$out"
         echo "payload-file=$out" >> "$GITHUB_OUTPUT"
 

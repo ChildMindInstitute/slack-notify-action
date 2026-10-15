@@ -87,8 +87,10 @@ def main():
         if args.vars:
             with Path.open(args.vars) as f:
                 ctx.update(as_object(json.load(f), "--vars file"))
+
         if args.vars_json:
             ctx.update(as_object(json.loads(args.vars_json), "--vars-json"))
+
         for item in args.var:
             key, sep, value = item.partition("=")
             if not sep:

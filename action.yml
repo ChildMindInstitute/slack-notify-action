@@ -9,7 +9,7 @@ inputs:
     description: Path to a template in the calling repo (needs actions/checkout first). Overrides `template`.
     default: ""
   status:
-    description: Pass `${{ job.status }}` from the caller (success / failure / cancelled)
+    description: Pass `job.status` from the caller (success / failure / cancelled)
     default: success
   vars:
     description: List of variables to pass to the template, e.g. `SERVICE=myapp ENVIRONMENT=production`

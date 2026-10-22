@@ -13,7 +13,7 @@ Example deployment:
           status: ${{ job.status }}
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           template: deploy
-          vars: |
+          vars: >-
             SERVICE=myapp
             ENVIRONMENT=production
 ```

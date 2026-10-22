@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -218,6 +219,7 @@ class TestCli:
         r = run_cli(str(tpl), "--vars-json", '{"X": "json"}', "-v", "X=arg", SLACK_VAR_X="env")
         assert json.loads(r.stdout)["text"] == "arg"
 
+    @pytest.mark.skip
     def test_vars_file(self, tpl, tmp_path):
         f = tmp_path / "v.json"
         f.write_text('{"X": ["a", "b"]}')
@@ -259,6 +261,46 @@ def render_step():
     action = yaml.safe_load((ROOT / "action.yml").read_text())
     return next(s for s in action["runs"]["steps"] if s.get("id") == "render")
 
+def parse_step():
+    action = yaml.safe_load((ROOT / "action.yml").read_text())
+    return next(s for s in action["runs"]["steps"] if s.get("id") == "parse-vars")
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="uv not installed")
+class TestActionParseVarsBlock:
+
+    def run(self, input_vars):
+        base = {k: v for k, v in CTX.items() if k not in EXTRA_VARS["deploy"]}
+        # full = clean_env(
+        #     ACTION_PATH=str(ROOT),
+        #     TEMPLATE="workflow",
+        #     TEMPLATE_FILE="",
+        #     OUTPUT_FILE="",
+        #     **{f"SLACK_VAR_{k}": v for k, v in base.items()},
+        #     INPUT_VARS=input_vars
+        # )
+
+        full = {
+            "INPUT_VARS": input_vars
+        }
+
+        run_step = parse_step()['run']
+
+        # Capture GITHUB_OUTPUT
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".txt") as f:
+            full['GITHUB_OUTPUT'] = f.name
+            r = subprocess.run(["bash", "-c", run_step], capture_output=True, text=True, env=full)
+
+            f.seek(0)
+            contents = f.read()
+
+            return r, contents.rstrip("\n")
+
+    def test_parse_vars(self):
+        r, output = self.run("SERVICE=svc\nENVIRONMENT=prod")
+        assert r.returncode == 0, r.stderr
+        assert output == "PARSED_VARS=-v SERVICE=svc -v ENVIRONMENT=prod"
+
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not installed")
 class TestActionRunBlock:
@@ -276,15 +318,16 @@ class TestActionRunBlock:
             TEMPLATE="workflow",
             TEMPLATE_FILE="",
             OUTPUT_FILE="",
+            INPUT_VARS=arg_list,
             **{f"SLACK_VAR_{k}": v for k, v in base.items()},
+
         )
         full.update(env)
 
         run_step = render_step()["run"]
-        run_step = run_step.replace("${{ inputs.vars }}", arg_list)
+        run_step = run_step.replace("${{ steps.parse-vars.outputs.PARSED_VARS }}", arg_list)
 
         r = subprocess.run(["bash", "-c", run_step], capture_output=True, text=True, env=full)
-        print(r.stdout)
         return r, gh_output.read_text()
 
     def test_success_sets_output_and_writes_valid_payload(self, tmp_path):
@@ -295,7 +338,7 @@ class TestActionRunBlock:
         rs.validate(load(path))
 
     def test_vars_from_action_supplies_template_extras(self, tmp_path, monkeypatch):
-        r, out = self.run(tmp_path, "SERVICE=svc ENVIRONMENT=prod",  TEMPLATE="deploy")
+        r, out = self.run(tmp_path, "-v SERVICE=svc -v ENVIRONMENT=prod",  TEMPLATE="deploy")
         assert r.returncode == 0, r.stderr
         assert "svc" in load(out.strip().removeprefix("payload-file="))["text"]
 

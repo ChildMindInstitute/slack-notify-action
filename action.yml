@@ -43,27 +43,44 @@ runs:
       with:
         enable-cache: false
 
+#    - id: parse-vars
+#      shell: bash
+#      run: |
+#        # Turn input.vars into environment variables and add them to the environment
+#        VARIABLES='${{ inputs.vars }}'
+#
+#        PARSED_VARS=()
+#
+#        while IFS= read -r line; do
+#            [[ -z "$line" ]] && continue
+#
+#            key="${line%%=*}"
+#            value="${line#*=}"
+#
+#            if [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+#                echo "Invalid variable name: $key" >&2
+#                exit 1
+#            fi
+#
+#            PARSED_VARS+=("-v $key=$value")
+#        done <<< "$VARIABLES"
+#        echo "PARSED_VARS=$PARSED_VARS" >> "$GITHUB_OUTPUT"
     - id: parse-vars
+      env:
+        INPUT_VARS: ${{ inputs.vars }}
       shell: bash
       run: |
-        # Turn input.vars into environment variables and add them to the environment
-        VARIABLES='${{ inputs.vars }}'
+        args=()
         
-        PARSED_VARS=()
-
         while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
+          [[ -z "$line" ]] && continue
+          args+=(-v "$line")
+        done <<< "$INPUT_VARS"
         
-            key="${line%%=*}"
-            value="${line#*=}"
+        PARSED_VARS="${args[*]}"
+        # Strip trailing newlines
+        PARSED_VARS=${PARSED_VARS//$'\n'}
         
-            if [[ ! "$key" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
-                echo "Invalid variable name: $key" >&2
-                exit 1
-            fi
-        
-            PARSED_VARS+=("-v $key=$value")
-        done <<< "$VARIABLES"
         echo "PARSED_VARS=$PARSED_VARS" >> "$GITHUB_OUTPUT"
 
     - id: render
@@ -100,28 +117,10 @@ runs:
         fi
         out="${OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/slack-payload.json}"
         
-        args=()
-        
-        # Parse variables from action        
-        VARIABLES='${{ inputs.vars }}'
-        
-        if [[ -n "${VARIABLES:-}" ]]; then
-          read -r -a vars <<< "$VARIABLES"
-        
-          for var in "${vars[@]}"; do
-            args+=(-v "$var")
-          done
-        fi
-        
         # [[ -n "$VARS_JSON" ]] && args+=(--vars-json "$VARS_JSON")
       
+        uv run "$ACTION_PATH/render_slack.py" "$tpl" ${{ steps.parse-vars.outputs.PARSED_VARS }} -o "$out"
         
-        if [[ ${#args[@]} -gt 0 ]]; then
-          echo "Running $ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"}
-          uv run "$ACTION_PATH/render_slack.py" "$tpl" ${args[@]+"${args[@]}"} -o "$out"
-        else
-          uv run "$ACTION_PATH/render_slack.py" "$tpl" -o "$out"
-        fi
         echo "payload-file=$out" >> "$GITHUB_OUTPUT"
 
     - name: Show payload (no webhook-url given)

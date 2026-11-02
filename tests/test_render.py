@@ -260,6 +260,7 @@ def render_step():
     action = yaml.safe_load((ROOT / "action.yml").read_text())
     return next(s for s in action["runs"]["steps"] if s.get("id") == "render")
 
+
 def parse_step():
     action = yaml.safe_load((ROOT / "action.yml").read_text())
     return next(s for s in action["runs"]["steps"] if s.get("id") == "parse-vars")
@@ -267,17 +268,14 @@ def parse_step():
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not installed")
 class TestActionParseVarsBlock:
-
     def run(self, input_vars):
-        full = {
-            "INPUT_VARS": input_vars
-        }
+        full = {"INPUT_VARS": input_vars}
 
-        run_step = parse_step()['run']
+        run_step = parse_step()["run"]
 
         # Capture GITHUB_OUTPUT
         with tempfile.NamedTemporaryFile(mode="w+", suffix=".txt") as f:
-            full['GITHUB_OUTPUT'] = f.name
+            full["GITHUB_OUTPUT"] = f.name
             r = subprocess.run(["bash", "-c", run_step], capture_output=True, text=True, env=full)
 
             f.seek(0)
@@ -309,7 +307,6 @@ class TestActionRunBlock:
             OUTPUT_FILE="",
             INPUT_VARS=arg_list,
             **{f"SLACK_VAR_{k}": v for k, v in base.items()},
-
         )
         full.update(env)
 
@@ -327,7 +324,7 @@ class TestActionRunBlock:
         rs.validate(load(path))
 
     def test_vars_from_action_supplies_template_extras(self, tmp_path, monkeypatch):
-        r, out = self.run(tmp_path, "-v SERVICE=svc -v ENVIRONMENT=prod",  TEMPLATE="deploy")
+        r, out = self.run(tmp_path, "-v SERVICE=svc -v ENVIRONMENT=prod", TEMPLATE="deploy")
         assert r.returncode == 0, r.stderr
         assert "svc" in load(out.strip().removeprefix("payload-file="))["text"]
 

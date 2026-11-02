@@ -156,7 +156,6 @@ def test_template_renders_validates_and_has_fallback_text(path):
     assert payload["text"], "top-level `text` is the notification fallback; keep it"
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize("path", TEMPLATES, ids=TEMPLATE_IDS)
 def test_template_golden_output(path):
     payload = rs.render(load(path), CTX)
@@ -270,16 +269,6 @@ def parse_step():
 class TestActionParseVarsBlock:
 
     def run(self, input_vars):
-        base = {k: v for k, v in CTX.items() if k not in EXTRA_VARS["deploy"]}
-        # full = clean_env(
-        #     ACTION_PATH=str(ROOT),
-        #     TEMPLATE="workflow",
-        #     TEMPLATE_FILE="",
-        #     OUTPUT_FILE="",
-        #     **{f"SLACK_VAR_{k}": v for k, v in base.items()},
-        #     INPUT_VARS=input_vars
-        # )
-
         full = {
             "INPUT_VARS": input_vars
         }

@@ -1,0 +1,63 @@
+{
+  "text": ":white_check_mark: myapp deploy success",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":white_check_mark: Deploy success: myapp",
+        "emoji": true
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Environment:*\nproduction"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Branch:*\n`main`"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Triggered by:*\nandrew"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Commit:*\n<https://github.com/me/app/commit/abc1234|abc1234>"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*Change:*\nFix \"quotes\" &amp; &lt;tags&gt;"
+      }
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View run"
+          },
+          "url": "https://github.com/me/app/actions/runs/9"
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "me/app • run #7"
+        }
+      ]
+    }
+  ]
+}

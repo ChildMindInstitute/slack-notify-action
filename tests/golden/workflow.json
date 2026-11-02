@@ -1,0 +1,47 @@
+{
+  "text": ":white_check_mark: Deploy success in me/app",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": ":white_check_mark: Deploy: success",
+        "emoji": true
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Repo:*\nme/app"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Branch:*\n`main`"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Triggered by:*\nandrew (push)"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Commit:*\n<https://github.com/me/app/commit/abc1234|abc1234>"
+        }
+      ]
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "text": "View run"
+          },
+          "url": "https://github.com/me/app/actions/runs/9"
+        }
+      ]
+    }
+  ]
+}
